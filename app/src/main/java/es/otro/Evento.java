@@ -1,4 +1,4 @@
-package es.mde;
+package es.otro;
 
 import java.util.Collection;
 
