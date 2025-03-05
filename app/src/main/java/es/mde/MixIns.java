@@ -1,5 +1,6 @@
 package es.mde;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
@@ -20,12 +21,12 @@ public class MixIns {
 	@JsonIgnoreType // Ignora un tipo por completo
 	public static interface IgnorarTipo {}
 	
-	@JsonIgnoreProperties(value = { "resultado", "ganador", // Evento
-			"visitante", "participantes", "equipos", // LocalContraVisitante
+	@JsonIgnoreProperties(value = {  "ganador", // Evento
+			"visitante", "participantes",  // LocalContraVisitante
 			"resultadoYEquipos", "goles", // EventoConGoles
 			"rojasTotal", "amarillasTotal", "tarjetas", // EventoConTarjetas
 			"cornersTotal", "corners", // EventoConCorners
-//			"competicion", // Partido
+			"competicion", // Partido
 			})
 	@JsonPropertyOrder({ "idLocal", "idVisitante", "timestamp", "sucesos" })
 	// Se puede heredar asi que mejor hacerlo sobre interfaces
@@ -33,6 +34,8 @@ public class MixIns {
 	public abstract class Partidos implements Datables, ContadorDeMinutos {
 		// aunque no es necesario aqui, solo es un ejemplo
 		@JsonIgnore Object local; // faltaba de LocalContraVisitante
+		@JsonProperty String idLocal;
+		@JsonProperty String idVisitante;
 	}
 	
 //	@JsonIgnoreProperties(value = { "temporal" })
@@ -41,6 +44,7 @@ public class MixIns {
 		// No tiene por que coincidir el tipo
 		@JsonIgnore Object getTemporal();
 		@JsonIgnore Object getFecha();
+//		@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd-MM-yyyy hh:mm:ss") Object getFecha(); 
 	}
 	
 	//Si utilizo sobre clase @JsonIgnoreProperties sobrescribe sin reutilizar

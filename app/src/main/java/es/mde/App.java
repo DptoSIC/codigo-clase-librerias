@@ -4,15 +4,20 @@
 package es.mde;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonParser.Feature;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.exc.StreamWriteException;
@@ -21,11 +26,14 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import es.lanyu.commons.config.Propiedades;
 import es.lanyu.commons.servicios.entidad.ServicioEntidad;
 import es.lanyu.commons.servicios.entidad.ServicioEntidadImpl;
 import es.lanyu.comun.evento.Partido;
+import es.lanyu.comun.suceso.Gol;
+import es.lanyu.comun.suceso.GolImpl;
 import es.lanyu.comun.suceso.Suceso;
 //import es.otro.Participante;
 //import es.otro.Partido;
@@ -39,6 +47,7 @@ public class App {
 //        Participante participante = new Participante(1, "Real Madrid");
         ObjectMapper mapper = new ObjectMapper();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
+        mapper.setSerializationInclusion(Include.NON_EMPTY);
 //        File archivo = new File("./participante.json");
 ////        objectMapper.writeValue(archivo, participante);
 //        String json = mapper.writeValueAsString(participante);
@@ -51,10 +60,11 @@ public class App {
         
         mapper.configure(Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
         mapper.addMixIn(Participante.class, MixIns.Participantes.class);
-//        mapper.addMixIn(Partido.class, MixIns.Partidos.class);
+        mapper.addMixIn(Partido.class, MixIns.Partidos.class);
 //        mapper.addMixIn(Partido.class, MixIns.Datable.class);
-        mapper.addMixIn(Partido.class, MixIns.Datables.class);
+//        mapper.addMixIn(Partido.class, MixIns.Datables.class);
         mapper.addMixIn(Suceso.class, MixIns.Datables.class);
+        mapper.addMixIn(Gol.class, MixIns.Goles.class);
         
 //        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     	File participantesFile = new File("./participantes.json");
@@ -83,51 +93,86 @@ public class App {
     	System.out.println("FIN LISTA\n");
     	
     	File liga = new File("./SP1.csv");
+//    	mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+//    	SimpleDateFormat df = new SimpleDateFormat("dd/MM/yyyy hh:mm");
     	List<Partido> partidos = new ArrayList<>();
     	try (BufferedReader br = new BufferedReader(new FileReader(liga))) {
-    		br.lines().map(l -> l.split(","))
-    				  .map(a -> new Partido(getParticipante(a[3], servicioEntidad, propiedadesInvertidas),
-    						  				getParticipante(a[4], servicioEntidad, propiedadesInvertidas)
-//    						  				Integer.parseInt(a[5]),
-//    						  				Integer.parseInt(a[6])
-    						  ))
+    		br.lines()//.map(l -> l.split(","))
+//    				  .map(a -> new Partido(getParticipante(a[3], servicioEntidad, propiedadesInvertidas),
+//    						  				getParticipante(a[4], servicioEntidad, propiedadesInvertidas)
+////    						  				Integer.parseInt(a[5]),
+////    						  				Integer.parseInt(a[6])
+//    						  ))
+    				  .map(l -> csvToPartido(l, servicioEntidad, propiedadesInvertidas))
     				  .forEach(p -> partidos.add(p));
     	} catch (Exception e) {
     		e.printStackTrace(System.out);
 		}
     	
-    	mapper.writeValue(new File("./partidosSP1.json"), partidos);
+    	JavaTimeModule module = new JavaTimeModule();
+    	mapper.registerModule(module);
+    	mapper.disable(SerializationFeature.INDENT_OUTPUT);
+    	File archivoPartidos = new File("./partidosSP1.json");
+    	try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivoPartidos))) {
+    		for (Partido partido : partidos) {
+    			writer.append(mapper.writeValueAsString(partido));
+    			writer.newLine();
+    		}
+    	} catch (Exception e) {
+    		e.printStackTrace(System.out);
+		}
+//    	mapper.writeValue(archivoPartidos, partidos);
+    	mapper.enable(SerializationFeature.INDENT_OUTPUT);
     	
 //    	File liga = new File("./partidos.json");
 //    	List<Partido> partidos = new ArrayList<>();
-//    	try (BufferedReader br = new BufferedReader(new FileReader(liga))) {
+//    	partidos.clear();
+//    	try (BufferedReader br = new BufferedReader(new FileReader(archivoPartidos))) {
 //    		br.lines().map(l -> lineaToPartido(l, mapper, servicioEntidad))
 //    				  .forEach(p -> partidos.add(p));
 //    	} catch (Exception e) {
 //    		e.printStackTrace(System.out);
 //		}
-//    	partidos.forEach(System.out::println);
+    	partidos.forEach(System.out::println);
     	
     	
-    	System.out.println("\n--- Gana RM por más de 2 ---\n");
-    	Participante RM = getParticipante("Real Madrid", servicioEntidad, propiedades);
-    	partidos.stream()
-//    			.filter(p -> {
-//    							boolean valido = false;
-//	    						if (p.getLocal().equals(RM)) {
-//	    							valido = p.getGolesLocal() - p.getGolesVisitante() > 2;
-//	    						} else if (p.getVisitante() == RM) {
-//	    							valido = p.getGolesLocal() - p.getGolesVisitante() < -2;
-//	    						}
-//    							return valido;
-//	    					 })
-    			.filter(p -> p.getGanador() == RM)// && p..getDiferenciaGoles() > 2)
-    			.forEach(System.out::println);
+    	
+//    	System.out.println("\n--- Gana RM por más de 2 ---\n");
+//    	Participante RM = getParticipante("Real Madrid", servicioEntidad, propiedades);
+//    	partidos.stream()
+////    			.filter(p -> {
+////    							boolean valido = false;
+////	    						if (p.getLocal().equals(RM)) {
+////	    							valido = p.getGolesLocal() - p.getGolesVisitante() > 2;
+////	    						} else if (p.getVisitante() == RM) {
+////	    							valido = p.getGolesLocal() - p.getGolesVisitante() < -2;
+////	    						}
+////    							return valido;
+////	    					 })
+//    			.filter(p -> p.getGanador() == RM)// && p..getDiferenciaGoles() > 2)
+//    			.forEach(System.out::println);
     	
 
     }
     
-    static Partido lineaToPartido(String linea, ObjectMapper mapper, ServicioEntidad servicioEntidad) {
+    private static SimpleDateFormat df = new SimpleDateFormat("dd/MM/yyyy hh:mm");
+    private static Partido csvToPartido(String linea, ServicioEntidad servicioEntidad, Properties propiedadesInvertidas) {
+    	String[] columnas = linea.split(",");
+    	Partido partido = new Partido(getParticipante(columnas[3], servicioEntidad, propiedadesInvertidas),
+			  						  getParticipante(columnas[4], servicioEntidad, propiedadesInvertidas));
+    	try {
+			partido.setFecha(df.parse(columnas[1] + " " + columnas[2]));
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+    	int golesLocal = Integer.parseInt(columnas[5].trim());
+    	partido.addSucesos(GolImpl.class, golesLocal, partido.getLocal());
+    	partido.addSucesos(GolImpl.class, Integer.parseInt(columnas[6].trim()), partido.getVisitante());
+    	
+		return partido;
+	}
+
+	static Partido lineaToPartido(String linea, ObjectMapper mapper, ServicioEntidad servicioEntidad) {
     	Partido partido = null;
 		try {
 			partido = mapper.readValue(linea, Partido.class);
